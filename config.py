@@ -37,10 +37,10 @@ if USE_3D_LANDMARKS:
 else:
     FEATURE_COUNT = NUM_LANDMARKS * 2  # 42 features
 
-# Real-Time Recognition & Stabilization
-CONFIDENCE_THRESHOLD = 0.65
-STABILIZATION_BUFFER_SIZE = 6  # consecutive matching predictions required for auto-confirm
-PREDICTION_COOLDOWN_SECONDS = 0.8
+# Real-Time Recognition & Stabilization (Ultra-Fast Responsive Mode)
+CONFIDENCE_THRESHOLD = 0.40
+STABILIZATION_BUFFER_SIZE = 3  # Fast 2-3 frame confirmation (~60-90ms)
+PREDICTION_COOLDOWN_SECONDS = 0.4  # Quick 400ms repeat delay for identical letters
 
 # Camera Settings
 CAMERA_INDEX = 0

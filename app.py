@@ -304,19 +304,19 @@ with st.sidebar:
     st.subheader("System Controls")
     confidence_thresh = st.slider(
         "Confidence Threshold",
-        min_value=0.50,
-        max_value=0.95,
+        min_value=0.25,
+        max_value=0.85,
         value=CONFIDENCE_THRESHOLD,
         step=0.05,
-        help="Predictions below this confidence level are treated as unconfirmed."
+        help="Lower threshold (e.g. 0.40) enables ultra-fast, instant prediction without holding."
     )
     if classifier:
         classifier.confidence_threshold = confidence_thresh
 
     auto_confirm = st.checkbox(
-        "Auto-Confirm Stabilized Letters",
+        "Auto-Confirm Letters to Sentence",
         value=True,
-        help="Automatically appends letter when stably held for 1 second."
+        help="Automatically appends confirmed letters to sentence within ~90 milliseconds."
     )
 
     mirror_mode = st.checkbox(

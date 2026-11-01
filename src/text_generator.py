@@ -26,31 +26,30 @@ class TextGenerator:
         self.current_text: str = ""
 
     def update_prediction(self, predicted_letter: Optional[str]) -> Optional[str]:
-        """Feed real-time prediction into the temporal stabilization buffer.
+        """Feed real-time prediction into rapid stabilization buffer.
         
-        Returns confirmed letter if stabilization criteria are met, else None.
-        Stabilization criteria:
-        1. Buffer is completely filled with the exact same letter.
-        2. Sufficient cooldown time has elapsed since the previous addition, OR
-           the confirmed letter is different from the immediate previous letter.
+        Optimized for ultra-fast response:
+        - Confirms a new letter immediately in 2-3 frames (~60-90ms).
+        - Enforces a short 0.4s cooldown only when repeating the exact same letter.
         """
         if predicted_letter is None:
-            # When hand is absent or low confidence, clear buffer gradually
             self.prediction_buffer.append(None)
             return None
 
         self.prediction_buffer.append(predicted_letter)
 
-        # Check if buffer has reached full capacity
-        if len(self.prediction_buffer) == self.prediction_buffer.maxlen:
-            # Check if all elements in the buffer match the current predicted letter
-            if all(item == predicted_letter for item in self.prediction_buffer):
+        required_matches = self.buffer_size
+        if len(self.prediction_buffer) >= required_matches:
+            # Check if all recent buffer items match the predicted letter
+            recent_items = list(self.prediction_buffer)[-required_matches:]
+            if all(x == predicted_letter for x in recent_items):
                 now = time.time()
-                # Enforce debounce cooldown for the same letter, or allow rapid new distinct letters
-                if (predicted_letter != self.last_added_letter) or (now - self.last_added_time >= self.cooldown_seconds):
+                is_new_letter = (predicted_letter != self.last_added_letter)
+                cooldown_passed = (now - self.last_added_time >= self.cooldown_seconds)
+
+                if is_new_letter or cooldown_passed:
                     self.last_added_time = now
                     self.last_added_letter = predicted_letter
-                    # Clear buffer after confirmation to prevent immediate repeated trigger
                     self.prediction_buffer.clear()
                     return predicted_letter
 
