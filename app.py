@@ -248,10 +248,12 @@ def load_hand_detector():
         st.error(f"Failed to initialize MediaPipe Hand Detector: {e}")
         return None
 
-@st.cache_resource(show_spinner=False)
 def load_gesture_classifier():
-    """Cache machine learning model instance."""
-    clf = GestureClassifier()
+    """Load fresh machine learning model instance with automatic reload."""
+    import importlib
+    import src.gesture_classifier
+    importlib.reload(src.gesture_classifier)
+    clf = src.gesture_classifier.GestureClassifier()
     if MODEL_PATH.exists() and LABEL_ENCODER_PATH.exists():
         loaded = clf.load(MODEL_PATH, LABEL_ENCODER_PATH)
         if loaded:
@@ -261,6 +263,20 @@ def load_gesture_classifier():
 
 detector = load_hand_detector()
 classifier = load_gesture_classifier()
+
+
+def safe_predict(clf, feat):
+    """Safely call classifier predict whether cached instance is old or updated."""
+    try:
+        res = clf.predict(feat, return_raw=True)
+        return res[0], res[1], res[2], res[3]
+    except (TypeError, ValueError):
+        res = clf.predict(feat)
+        p_label, c, p_dict = res[0], res[1], res[2]
+        r_label = p_label
+        if r_label is None and p_dict:
+            r_label = max(p_dict, key=p_dict.get)
+        return p_label, c, p_dict, r_label
 
 
 # ==========================================
@@ -510,7 +526,7 @@ if navigation == "Live Recognition Studio":
 
                             if landmarks_list and classifier:
                                 features = detector.extract_features(landmarks_list[0], include_z=USE_3D_LANDMARKS)
-                                pred_label, conf, prob_dict, raw_label = classifier.predict(features, return_raw=True)
+                                pred_label, conf, prob_dict, raw_label = safe_predict(classifier, features)
 
                                 st.session_state.last_predicted_letter = pred_label
                                 st.session_state.last_confidence = conf
@@ -614,7 +630,7 @@ if navigation == "Live Recognition Studio":
 
                     if landmarks_list and classifier:
                         features = detector.extract_features(landmarks_list[0], include_z=USE_3D_LANDMARKS)
-                        pred_label, conf, _, raw_label = classifier.predict(features, return_raw=True)
+                        pred_label, conf, _, raw_label = safe_predict(classifier, features)
                         st.session_state.last_predicted_letter = pred_label
                         st.session_state.last_confidence = conf
                         render_telemetry_ui(pred_label, raw_label, conf, st.session_state.text_generator.get_text())
@@ -644,7 +660,7 @@ if navigation == "Live Recognition Studio":
 
                     if landmarks_list and classifier:
                         features = detector.extract_features(landmarks_list[0], include_z=USE_3D_LANDMARKS)
-                        pred_label, conf, _, raw_label = classifier.predict(features, return_raw=True)
+                        pred_label, conf, _, raw_label = safe_predict(classifier, features)
                         st.session_state.last_predicted_letter = pred_label
                         st.session_state.last_confidence = conf
                         render_telemetry_ui(pred_label, raw_label, conf, st.session_state.text_generator.get_text())
