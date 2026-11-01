@@ -333,7 +333,17 @@ st.markdown(
 # TAB 1: LIVE RECOGNITION STUDIO
 # ==============================================================================
 if navigation == "Live Recognition Studio":
-    col_cam, col_pred = st.columns([1.5, 1.0], gap="large")
+    col_cam, col_pred = st.columns([1.4, 1.0], gap="large")
+
+    # Define right column telemetry placeholders FIRST so they can be updated dynamically
+    with col_pred:
+        st.subheader("Recognition Telemetry")
+        pred_box_slot = st.empty()
+        conf_progress_slot = st.empty()
+        conf_caption_slot = st.empty()
+        st.markdown("---")
+        st.markdown("**Supported ASL Static Alphabet:**")
+        alphabet_slot = st.empty()
 
     with col_cam:
         st.subheader("Webcam Vision Feed")
@@ -346,20 +356,101 @@ if navigation == "Live Recognition Studio":
         video_placeholder = st.empty()
         status_placeholder = st.empty()
 
+    # Define Sentence Section placeholders FIRST
+    st.markdown("---")
+    st.subheader("Sentence Constructor & Voice Synthesis")
+    sentence_card_slot = st.empty()
+
+    # Helper function to dynamically update telemetry cards & sentence card
+    def render_telemetry_ui(p_letter, r_letter, c_val, curr_sent):
+        if p_letter:
+            b_cls = "status-active"
+            b_txt = "GESTURE CONFIRMED"
+            disp_char = p_letter
+        elif r_letter and c_val >= 0.35:
+            b_cls = "status-idle"
+            b_txt = f"DETECTING: {r_letter} (HOLD STEADY)"
+            disp_char = r_letter
+        else:
+            b_cls = "status-alert"
+            b_txt = "WAITING FOR GESTURE"
+            disp_char = "—"
+
+        pred_box_slot.markdown(
+            f"""
+            <div class="prediction-box">
+                <div class="metric-label">Predicted Gesture Class</div>
+                <div class="gesture-large">{disp_char}</div>
+                <div>
+                    <span class="status-badge {b_cls}">
+                        {b_txt}
+                    </span>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        conf_progress_slot.progress(min(max(float(c_val), 0.0), 1.0))
+        conf_caption_slot.caption(
+            f"Estimated Confidence: **{c_val * 100:.1f}%** (Threshold: {confidence_thresh * 100:.0f}%)"
+        )
+
+        # Alphabet highlights
+        active_c = p_letter if p_letter else (r_letter if c_val >= 0.35 else None)
+        pills = "<div style='display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;'>"
+        for g in GESTURE_CLASSES:
+            act = (g == active_c)
+            col = "#00d4ff" if act else "#64748b"
+            bg = "rgba(0, 212, 255, 0.2)" if act else "rgba(100, 116, 139, 0.1)"
+            bord = f"2px solid {col}" if act else "1px solid rgba(100, 116, 139, 0.3)"
+            pills += f"<div style='flex: 1 0 16%; text-align: center; padding: 6px; border: {bord}; border-radius: 8px; font-weight: bold; color: {col}; background: {bg};'>{g}</div>"
+        pills += "</div>"
+        alphabet_slot.markdown(pills, unsafe_allow_html=True)
+
+        sent_disp = curr_sent if curr_sent else "<span style='color: #475569;'>No text generated yet. Hold a gesture to auto-add...</span>"
+        sentence_card_slot.markdown(
+            f"""
+            <div class="sentence-card">
+                <div style="font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">Constructed Sentence:</div>
+                <div class="sentence-text">{sent_disp}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    # Initial render of telemetry
+    render_telemetry_ui(
+        st.session_state.last_predicted_letter,
+        None,
+        st.session_state.last_confidence,
+        st.session_state.text_generator.get_text()
+    )
+
+    with col_cam:
+        # Quick gesture guide
+        with st.expander("📖 Quick Gesture Guide (How to hold your hand for each sign)", expanded=False):
+            st.markdown(
+                """
+                - **`L`**: Index finger straight UP + Thumb extended horizontally (Forms an 'L' shape) ⭐ *Easiest to test!*
+                - **`V`**: Index & Middle fingers UP in a 'V' shape (Peace sign)
+                - **`W`**: Index, Middle, & Ring fingers UP (3 fingers)
+                - **`Y`**: Thumb & Pinky extended out sideways (Shaka / Hang-loose shape)
+                - **`B`**: 4 fingers straight UP together, thumb tucked over palm
+                - **`D`**: Index pointing UP, thumb touching middle fingertip
+                - **`C`**: Curved hand forming the letter 'C'
+                - **`O`**: All fingertips touching thumb to form an 'O'
+                - **`A`**: Closed fist with thumb upright alongside index
+                - **`E`**: Closed fist with fingers curled tight down
+                """
+            )
+
         # ----------------------------------------------------
         # Mode A: Continuous Webcam Stream (OpenCV cv2)
         # ----------------------------------------------------
         if feed_mode == "Continuous Webcam Stream":
-            btn_col1, btn_col2 = st.columns(2)
-            with btn_col1:
-                start_btn = st.button("Start Camera Stream", type="primary", use_container_width=True)
-            with btn_col2:
-                stop_btn = st.button("Stop Camera Stream", type="secondary", use_container_width=True)
-
-            if start_btn:
-                st.session_state.camera_running = True
-            if stop_btn:
-                st.session_state.camera_running = False
+            cam_toggle = st.toggle("Activate Live Webcam Stream", value=st.session_state.camera_running)
+            st.session_state.camera_running = cam_toggle
 
             if st.session_state.camera_running:
                 cap = cv2.VideoCapture(CAMERA_INDEX)
@@ -387,13 +478,17 @@ if navigation == "Live Recognition Studio":
                         if mirror_mode:
                             frame = cv2.flip(frame, 1)
 
+                        pred_label = None
+                        raw_label = None
+                        conf = 0.0
+
                         if detector:
                             landmarks_list, handedness = detector.process_frame(frame)
                             annotated_frame = detector.draw_landmarks(frame, landmarks_list)
 
                             if landmarks_list and classifier:
                                 features = detector.extract_features(landmarks_list[0], include_z=USE_3D_LANDMARKS)
-                                pred_label, conf, prob_dict = classifier.predict(features)
+                                pred_label, conf, prob_dict, raw_label = classifier.predict(features, return_raw=True)
 
                                 st.session_state.last_predicted_letter = pred_label
                                 st.session_state.last_confidence = conf
@@ -409,10 +504,37 @@ if navigation == "Live Recognition Studio":
                         else:
                             annotated_frame = frame
 
-                        # Convert BGR to RGB for Streamlit rendering
+                        current_sent = st.session_state.text_generator.get_text()
+
+                        # Draw High-Tech In-Video HUD on Frame
+                        h_f, w_f, _ = annotated_frame.shape
+                        # Top HUD Bar
+                        overlay_top = annotated_frame.copy()
+                        cv2.rectangle(overlay_top, (0, 0), (w_f, 55), (10, 14, 23), -1)
+                        cv2.rectangle(overlay_top, (0, h_f - 40), (w_f, h_f), (10, 14, 23), -1)
+                        cv2.addWeighted(overlay_top, 0.70, annotated_frame, 0.30, 0, annotated_frame)
+
+                        if pred_label:
+                            cv2.putText(annotated_frame, f"RECOGNIZED: {pred_label}", (15, 38), cv2.FONT_HERSHEY_DUPLEX, 0.95, (0, 255, 255), 2, cv2.LINE_AA)
+                            cv2.putText(annotated_frame, f"CONF: {conf*100:.0f}%", (w_f - 170, 38), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 255, 128), 2, cv2.LINE_AA)
+                        elif raw_label and conf >= 0.35:
+                            cv2.putText(annotated_frame, f"DETECTING: {raw_label} ({conf*100:.0f}%)", (15, 38), cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 180, 255), 2, cv2.LINE_AA)
+                            cv2.putText(annotated_frame, "HOLD STEADY", (w_f - 170, 38), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 180, 255), 1, cv2.LINE_AA)
+                        else:
+                            cv2.putText(annotated_frame, "SHOW ASL SIGN (L, V, W, Y, B...)", (15, 38), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (148, 163, 184), 2, cv2.LINE_AA)
+
+                        # Bottom Sentence Banner
+                        disp_bottom = f">> {current_sent}" if current_sent else ">> Sentence: [Empty - hold a sign to add]"
+                        cv2.putText(annotated_frame, disp_bottom, (15, h_f - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 212, 255), 2, cv2.LINE_AA)
+
+                        # Render updated video frame
                         frame_rgb = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
                         video_placeholder.image(frame_rgb, channels="RGB", use_container_width=True)
-                        time.sleep(0.02)  # Yield thread
+
+                        # Dynamically update the right telemetry panel & sentence box
+                        render_telemetry_ui(pred_label, raw_label, conf, current_sent)
+
+                        time.sleep(0.015)  # Yield thread
 
                     cap.release()
                     status_placeholder.markdown(
@@ -420,8 +542,7 @@ if navigation == "Live Recognition Studio":
                         unsafe_allow_html=True
                     )
             else:
-                status_placeholder.info("Click 'Start Camera Stream' to activate live recognition.")
-                # Show placeholder guide image
+                status_placeholder.info("Toggle 'Activate Live Webcam Stream' above to start real-time recognition.")
                 placeholder_img = np.zeros((360, 540, 3), dtype=np.uint8)
                 cv2.putText(
                     placeholder_img,
@@ -434,7 +555,7 @@ if navigation == "Live Recognition Studio":
                 )
                 cv2.putText(
                     placeholder_img,
-                    "Press 'Start Camera Stream' or use 'Browser Snapshot'",
+                    "Toggle 'Activate Live Webcam Stream' to begin",
                     (70, 210),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.5,
@@ -462,14 +583,16 @@ if navigation == "Live Recognition Studio":
 
                     if landmarks_list and classifier:
                         features = detector.extract_features(landmarks_list[0], include_z=USE_3D_LANDMARKS)
-                        pred_label, conf, _ = classifier.predict(features)
+                        pred_label, conf, _, raw_label = classifier.predict(features, return_raw=True)
                         st.session_state.last_predicted_letter = pred_label
                         st.session_state.last_confidence = conf
+                        render_telemetry_ui(pred_label, raw_label, conf, st.session_state.text_generator.get_text())
                         if pred_label:
                             status_placeholder.success(f"Recognized: {pred_label} ({conf*100:.1f}%)")
                     else:
                         st.session_state.last_predicted_letter = None
                         st.session_state.last_confidence = 0.0
+                        render_telemetry_ui(None, None, 0.0, st.session_state.text_generator.get_text())
                         status_placeholder.warning("No hand detected in captured photo.")
 
         # ----------------------------------------------------
@@ -490,73 +613,17 @@ if navigation == "Live Recognition Studio":
 
                     if landmarks_list and classifier:
                         features = detector.extract_features(landmarks_list[0], include_z=USE_3D_LANDMARKS)
-                        pred_label, conf, _ = classifier.predict(features)
+                        pred_label, conf, _, raw_label = classifier.predict(features, return_raw=True)
                         st.session_state.last_predicted_letter = pred_label
                         st.session_state.last_confidence = conf
+                        render_telemetry_ui(pred_label, raw_label, conf, st.session_state.text_generator.get_text())
                         if pred_label:
                             status_placeholder.success(f"Recognized Gesture: '{pred_label}' ({conf*100:.1f}%)")
                     else:
                         st.session_state.last_predicted_letter = None
                         st.session_state.last_confidence = 0.0
+                        render_telemetry_ui(None, None, 0.0, st.session_state.text_generator.get_text())
                         status_placeholder.warning("No hand landmarks identified in image.")
-
-    # --------------------------------------------------------
-    # RIGHT COLUMN: PREDICTION & REAL-TIME RECOGNITION DISPLAY
-    # --------------------------------------------------------
-    with col_pred:
-        st.subheader("Recognition Telemetry")
-
-        pred_letter = st.session_state.last_predicted_letter
-        conf = st.session_state.last_confidence
-
-        st.markdown(
-            f"""
-            <div class="prediction-box">
-                <div class="metric-label">Predicted Gesture Class</div>
-                <div class="gesture-large">{pred_letter if pred_letter else "—"}</div>
-                <div>
-                    <span class="status-badge {'status-active' if pred_letter else 'status-alert'}">
-                        {'RECOGNIZED' if pred_letter else 'WAITING FOR HAND'}
-                    </span>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-        st.markdown("**Confidence Probability:**")
-        st.progress(min(max(float(conf), 0.0), 1.0))
-        st.caption(f"Estimated Confidence: **{conf * 100:.1f}%** (Threshold: {confidence_thresh * 100:.0f}%)")
-
-        st.markdown("---")
-        st.markdown("**Supported ASL Static Alphabet:**")
-        cols_gest = st.columns(5)
-        for idx, g in enumerate(GESTURE_CLASSES):
-            with cols_gest[idx % 5]:
-                is_active = (g == pred_letter)
-                color = "#00d4ff" if is_active else "#64748b"
-                st.markdown(
-                    f"<div style='text-align:center; padding: 6px; border: 1px solid {color}; border-radius: 8px; font-weight: bold; color: {color}; margin-bottom: 6px;'>{g}</div>",
-                    unsafe_allow_html=True
-                )
-
-    # --------------------------------------------------------
-    # BOTTOM SECTION: TEXT GENERATION & TEXT-TO-SPEECH
-    # --------------------------------------------------------
-    st.markdown("---")
-    st.subheader("Sentence Constructor & Voice Synthesis")
-
-    current_sentence = st.session_state.text_generator.get_text()
-
-    st.markdown(
-        f"""
-        <div class="sentence-card">
-            <div style="font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">Constructed Sentence:</div>
-            <div class="sentence-text">{current_sentence if current_sentence else "<span style='color: #475569;'>No text generated yet. Hold a gesture or click 'Add Current Letter'...</span>"}</div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
 
     # Text & Speech Action Controls
     c1, c2, c3, c4, c5, c6 = st.columns(6)

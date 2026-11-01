@@ -57,20 +57,26 @@ class GestureClassifier:
         self.is_trained = True
         return self
 
-    def predict(self, feature_vector: np.ndarray) -> Tuple[Optional[str], float, Dict[str, float]]:
+    def predict(
+        self,
+        feature_vector: np.ndarray,
+        return_raw: bool = False
+    ) -> Any:
         """Predict gesture for a single feature vector.
         
         Args:
             feature_vector: 1D array of normalized hand landmarks.
+            return_raw: If True, also returns the top candidate label regardless of threshold.
             
         Returns:
             Tuple of:
             - predicted_label (str or None if below confidence threshold)
             - confidence (float between 0.0 and 1.0)
             - probabilities_dict (map from class name to confidence probability)
+            - raw_label (optional 4th item if return_raw=True)
         """
         if not self.is_trained or self.model is None:
-            return None, 0.0, {}
+            return (None, 0.0, {}, None) if return_raw else (None, 0.0, {})
 
         # Ensure 2D shape (1, num_features)
         if feature_vector.ndim == 1:
@@ -85,7 +91,7 @@ class GestureClassifier:
 
         # Get class label
         classes = self.label_encoder.classes_
-        predicted_label = str(classes[max_idx])
+        raw_label = str(classes[max_idx])
 
         # Map all probabilities
         prob_dict = {
@@ -94,10 +100,11 @@ class GestureClassifier:
         }
 
         # Apply confidence threshold filtering
-        if confidence < self.confidence_threshold:
-            return None, confidence, prob_dict
+        confirmed_label = raw_label if confidence >= self.confidence_threshold else None
 
-        return predicted_label, confidence, prob_dict
+        if return_raw:
+            return confirmed_label, confidence, prob_dict, raw_label
+        return confirmed_label, confidence, prob_dict
 
     def save(
         self,
