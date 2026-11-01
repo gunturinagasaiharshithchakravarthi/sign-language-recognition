@@ -14,10 +14,11 @@ METRICS_PATH = MODELS_DIR / "model_metrics.json"
 ASSETS_DIR = ROOT_DIR / "assets"
 CONFUSION_MATRIX_PATH = ASSETS_DIR / "confusion_matrix.png"
 
-# Supported Static Gestures (ASL letters + special controls)
+# Supported Static Gestures (All 26 ASL Alphabet Letters A-Z)
 GESTURE_CLASSES = [
-    "A", "B", "C", "D", "E",
-    "L", "O", "V", "W", "Y"
+    "A", "B", "C", "D", "E", "F", "G", "H", "I", "J",
+    "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T",
+    "U", "V", "W", "X", "Y", "Z"
 ]
 
 # MediaPipe Hand Detection Hyperparameters
@@ -37,9 +38,9 @@ else:
     FEATURE_COUNT = NUM_LANDMARKS * 2  # 42 features
 
 # Real-Time Recognition & Stabilization
-CONFIDENCE_THRESHOLD = 0.75
-STABILIZATION_BUFFER_SIZE = 8  # consecutive matching predictions required for auto-confirm
-PREDICTION_COOLDOWN_SECONDS = 1.0
+CONFIDENCE_THRESHOLD = 0.65
+STABILIZATION_BUFFER_SIZE = 6  # consecutive matching predictions required for auto-confirm
+PREDICTION_COOLDOWN_SECONDS = 0.8
 
 # Camera Settings
 CAMERA_INDEX = 0
