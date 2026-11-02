@@ -51,247 +51,255 @@ def create_base_pose(gesture: str) -> np.ndarray:
         coords[mcp_idx + 2] = [mcp[0], dip_y, z_offset * 1.5]
         coords[mcp_idx + 3] = [mcp[0], tip_y, z_offset * 1.8]
 
-    # Gestures Definition (All 26 ASL Alphabet Letters A-Z)
+    # Gestures Definition (All 26 ASL Alphabet Letters A-Z with distinct biomechanics)
     if gesture == "A":
-        # All 4 fingers curled into a fist, thumb straight up along index
+        # Fist with thumb upright resting alongside index finger
         curl_finger(5)
         curl_finger(9)
         curl_finger(13)
         curl_finger(17)
-        coords[3] = [0.36, 0.55, -0.02]
-        coords[4] = [0.38, 0.48, -0.03]
+        # Thumb straight UP along side of fist
+        coords[3] = [0.34, 0.58, -0.01]
+        coords[4] = [0.34, 0.48, -0.02]
 
     elif gesture == "B":
-        # 4 fingers straight up together, thumb folded over palm
-        extend_finger(5, -0.05, -1.0, 0.0)
+        # 4 fingers straight UP together, thumb folded across palm
+        extend_finger(5, -0.04, -1.0, 0.0)
         extend_finger(9, 0.0, -1.0, 0.0)
-        extend_finger(13, 0.05, -1.0, 0.0)
-        extend_finger(17, 0.1, -1.0, 0.0)
-        coords[3] = [0.46, 0.65, 0.04]
-        coords[4] = [0.52, 0.66, 0.04]
+        extend_finger(13, 0.04, -1.0, 0.0)
+        extend_finger(17, 0.08, -1.0, 0.0)
+        coords[3] = [0.46, 0.66, 0.05]
+        coords[4] = [0.52, 0.67, 0.05]
 
     elif gesture == "C":
-        # Curved fingers and thumb forming a 'C'
-        for mcp, target_x in [(5, 0.38), (9, 0.40), (13, 0.42), (17, 0.44)]:
-            coords[mcp + 1] = [target_x, 0.48, 0.05]
-            coords[mcp + 2] = [target_x + 0.05, 0.45, 0.07]
-            coords[mcp + 3] = [target_x + 0.10, 0.48, 0.08]
-        coords[3] = [0.44, 0.60, 0.06]
-        coords[4] = [0.48, 0.55, 0.07]
+        # Curved fingers and thumb forming an open 'C' claw (clear gap to thumb)
+        for mcp, target_x in [(5, 0.40), (9, 0.44), (13, 0.48), (17, 0.52)]:
+            coords[mcp + 1] = [target_x, 0.46, 0.08]
+            coords[mcp + 2] = [target_x + 0.06, 0.43, 0.12]
+            coords[mcp + 3] = [target_x + 0.12, 0.47, 0.14]
+        # Thumb curved upward with distinct 0.25 gap to fingertips
+        coords[3] = [0.38, 0.65, 0.08]
+        coords[4] = [0.42, 0.60, 0.10]
 
     elif gesture == "D":
-        # Index straight up, other three curled touching thumb
-        extend_finger(5, 0.0, -1.0, 0.0)
+        # Index straight UP vertically, other 3 curled into palm touching thumb
+        extend_finger(5, 0.0, -1.0, 0.0)  # Index high and straight
         curl_finger(9)
         curl_finger(13)
         curl_finger(17)
-        coords[3] = [0.45, 0.60, 0.03]
-        coords[4] = [0.50, 0.58, 0.03]
+        # Thumb touches curled middle fingertip
+        coords[3] = [0.44, 0.62, 0.03]
+        coords[4] = [0.48, 0.58, 0.03]
 
     elif gesture == "E":
-        # Tight curled fingers, thumb folded underneath
-        curl_finger(5)
-        curl_finger(9)
-        curl_finger(13)
-        curl_finger(17)
-        coords[3] = [0.45, 0.70, 0.05]
-        coords[4] = [0.52, 0.70, 0.05]
+        # Flat knuckles, all 4 fingers curled down tight, thumb tucked HORIZONTALLY below
+        for mcp in [5, 9, 13, 17]:
+            coords[mcp + 1] = [coords[mcp][0], 0.58, 0.04]
+            coords[mcp + 2] = [coords[mcp][0], 0.64, 0.05]
+            coords[mcp + 3] = [coords[mcp][0], 0.69, 0.03]
+        # Thumb tucked horizontally across bottom of finger pads
+        coords[3] = [0.44, 0.72, 0.02]
+        coords[4] = [0.52, 0.72, 0.02]
 
     elif gesture == "F":
-        # Thumb and index tips touch forming circle, middle/ring/pinky extended UP
-        coords[6] = [0.40, 0.52, 0.03]
-        coords[7] = [0.42, 0.54, 0.04]
-        coords[8] = [0.45, 0.56, 0.04]
-        coords[3] = [0.40, 0.60, 0.03]
-        coords[4] = [0.45, 0.56, 0.04]
+        # Thumb and index tips touch forming circle ('OK' sign), middle/ring/pinky extended UP
+        coords[6] = [0.40, 0.54, 0.04]
+        coords[7] = [0.43, 0.58, 0.05]
+        coords[8] = [0.46, 0.60, 0.05]  # Index tip touches thumb
+        coords[3] = [0.40, 0.64, 0.04]
+        coords[4] = [0.46, 0.60, 0.05]  # Thumb tip touches index
         extend_finger(9, -0.05, -1.0, 0.0)
         extend_finger(13, 0.05, -1.0, 0.0)
         extend_finger(17, 0.15, -1.0, 0.0)
 
     elif gesture == "G":
-        # Index pointing horizontally left, thumb extended alongside, others curled
-        extend_finger(5, -1.0, 0.0, 0.0)
+        # Hand in profile: Index pointing horizontally left, thumb extended alongside
+        extend_finger(5, -1.0, 0.0, 0.0)  # Index horizontal
         curl_finger(9)
         curl_finger(13)
         curl_finger(17)
-        coords[3] = [0.32, 0.60, 0.02]
-        coords[4] = [0.24, 0.60, 0.02]
+        # Thumb parallel to index pointing left
+        coords[3] = [0.32, 0.62, 0.02]
+        coords[4] = [0.22, 0.60, 0.02]
 
     elif gesture == "H":
-        # Index and middle pointing horizontally left together, others curled
-        extend_finger(5, -1.0, 0.0, 0.0)
+        # Hand in profile: Index AND middle pointing horizontally left together
+        extend_finger(5, -1.0, -0.05, 0.0)
         extend_finger(9, -1.0, 0.05, 0.0)
         curl_finger(13)
         curl_finger(17)
-        coords[3] = [0.40, 0.66, 0.03]
-        coords[4] = [0.35, 0.66, 0.03]
+        coords[3] = [0.40, 0.68, 0.03]
+        coords[4] = [0.34, 0.68, 0.03]
 
     elif gesture == "I":
-        # Pinky extended straight UP, others curled, thumb folded across
+        # Pinky extended straight UP, others curled, thumb folded across index/middle
         curl_finger(5)
         curl_finger(9)
         curl_finger(13)
         extend_finger(17, 0.0, -1.0, 0.0)
-        coords[3] = [0.46, 0.65, 0.04]
-        coords[4] = [0.50, 0.65, 0.04]
+        coords[3] = [0.46, 0.65, 0.05]
+        coords[4] = [0.50, 0.65, 0.05]
 
     elif gesture == "J":
-        # Pinky extended with curved wrist/tip
+        # Pinky extended with curved wrist/hook
         curl_finger(5)
         curl_finger(9)
         curl_finger(13)
-        extend_finger(17, -0.3, -0.9, 0.0)
-        coords[20] = [coords[19][0] - 0.03, coords[19][1] - 0.02, 0.03]
-        coords[3] = [0.46, 0.65, 0.04]
-        coords[4] = [0.50, 0.65, 0.04]
+        extend_finger(17, -0.4, -0.9, 0.05)
+        coords[20] = [coords[19][0] - 0.04, coords[19][1] + 0.02, 0.06]
+        coords[3] = [0.46, 0.65, 0.05]
+        coords[4] = [0.50, 0.65, 0.05]
 
     elif gesture == "K":
-        # Index straight up, middle tilted slightly forward, thumb between
+        # Index straight UP, middle tilted forward at 45 deg, thumb between them
         extend_finger(5, -0.1, -1.0, 0.0)
-        extend_finger(9, 0.15, -0.9, 0.2)
+        extend_finger(9, 0.15, -0.8, 0.3)
         curl_finger(13)
         curl_finger(17)
-        coords[3] = [0.42, 0.60, 0.05]
-        coords[4] = [0.45, 0.54, 0.08]
+        coords[3] = [0.42, 0.60, 0.08]
+        coords[4] = [0.46, 0.54, 0.12]
 
     elif gesture == "L":
-        # Index straight up, thumb extended sideways (90 deg 'L'), others curled
+        # Index straight UP, thumb extended horizontally (90 deg L)
         extend_finger(5, 0.0, -1.0, 0.0)
         curl_finger(9)
         curl_finger(13)
         curl_finger(17)
         coords[3] = [0.28, 0.68, 0.0]
-        coords[4] = [0.20, 0.68, 0.0]
+        coords[4] = [0.18, 0.68, 0.0]
 
     elif gesture == "M":
-        # 3 fingers (index, middle, ring) folded over thumb, pinky curled
-        curl_finger(5)
-        curl_finger(9)
-        curl_finger(13)
-        curl_finger(17)
-        coords[3] = [0.48, 0.62, -0.04]
-        coords[4] = [0.56, 0.62, -0.04]
+        # 3 fingers (index, middle, ring) folded over thumb, thumb pokes under ring
+        for mcp in [5, 9, 13]:
+            coords[mcp + 1] = [coords[mcp][0], 0.58, 0.04]
+            coords[mcp + 2] = [coords[mcp][0], 0.64, 0.05]
+            coords[mcp + 3] = [coords[mcp][0], 0.68, 0.04]
+        curl_finger(17)  # Pinky curled
+        coords[3] = [0.48, 0.66, 0.01]
+        coords[4] = [0.56, 0.66, 0.01]  # Thumb under ring finger
 
     elif gesture == "N":
-        # 2 fingers (index, middle) folded over thumb, ring & pinky curled
-        curl_finger(5)
-        curl_finger(9)
-        curl_finger(13)
-        curl_finger(17)
-        coords[3] = [0.44, 0.62, -0.04]
-        coords[4] = [0.50, 0.62, -0.04]
+        # 2 fingers (index, middle) folded over thumb, thumb pokes under middle
+        for mcp in [5, 9]:
+            coords[mcp + 1] = [coords[mcp][0], 0.58, 0.04]
+            coords[mcp + 2] = [coords[mcp][0], 0.64, 0.05]
+            coords[mcp + 3] = [coords[mcp][0], 0.68, 0.04]
+        curl_finger(13)  # Ring curled
+        curl_finger(17)  # Pinky curled
+        coords[3] = [0.44, 0.66, 0.01]
+        coords[4] = [0.50, 0.66, 0.01]  # Thumb under middle finger
 
     elif gesture == "O":
-        # All fingertips touch thumb forming an 'O'
-        o_center = [0.48, 0.50, 0.05]
+        # All fingertips touch thumb tip forming a closed 'O' circle
+        o_center = [0.46, 0.54, 0.08]
         for mcp in [5, 9, 13, 17]:
-            coords[mcp + 1] = [coords[mcp][0], 0.46, 0.03]
-            coords[mcp + 2] = [o_center[0] + 0.02, 0.48, 0.04]
+            coords[mcp + 1] = [coords[mcp][0], 0.50, 0.06]
+            coords[mcp + 2] = [o_center[0] + 0.02, 0.52, 0.07]
             coords[mcp + 3] = o_center
-        coords[3] = [0.42, 0.55, 0.03]
-        coords[4] = o_center
+        coords[3] = [0.42, 0.60, 0.06]
+        coords[4] = o_center  # Thumb tip touching all fingertips
 
     elif gesture == "P":
-        # Like K but tilted downwards
-        extend_finger(5, -0.6, 0.8, 0.0)
-        extend_finger(9, -0.3, 0.9, 0.2)
+        # Like K but angled downwards: index forward/down, middle straight down
+        extend_finger(5, -0.6, 0.7, 0.0)
+        extend_finger(9, -0.2, 0.9, 0.2)
         curl_finger(13)
         curl_finger(17)
-        coords[3] = [0.42, 0.60, 0.05]
-        coords[4] = [0.45, 0.64, 0.08]
+        coords[3] = [0.42, 0.64, 0.06]
+        coords[4] = [0.44, 0.70, 0.09]
 
     elif gesture == "Q":
-        # Like G pointing downwards (index and thumb pointing down)
-        extend_finger(5, -0.2, 1.0, 0.0)
+        # Like G pointing downward: index and thumb pinched pointing down
+        extend_finger(5, -0.3, 0.9, 0.0)
         curl_finger(9)
         curl_finger(13)
         curl_finger(17)
-        coords[3] = [0.38, 0.65, 0.02]
-        coords[4] = [0.36, 0.75, 0.02]
+        coords[3] = [0.38, 0.68, 0.02]
+        coords[4] = [0.34, 0.78, 0.02]
 
     elif gesture == "R":
-        # Index and middle crossed over each other, others curled
-        extend_finger(5, 0.05, -1.0, 0.0)
-        extend_finger(9, -0.05, -1.0, 0.05)  # crosses slightly in front
+        # Index and middle crossed over each other pointing UP
+        extend_finger(5, 0.04, -1.0, 0.0)
+        extend_finger(9, -0.04, -1.0, 0.06)  # Crosses in front of index
         curl_finger(13)
         curl_finger(17)
-        coords[3] = [0.46, 0.64, 0.03]
-        coords[4] = [0.50, 0.64, 0.03]
+        coords[3] = [0.46, 0.64, 0.04]
+        coords[4] = [0.50, 0.64, 0.04]
 
     elif gesture == "S":
-        # Closed fist with thumb crossed in FRONT of fingers
+        # Fist with thumb wrapped horizontally across the FRONT of fingers
         curl_finger(5)
         curl_finger(9)
         curl_finger(13)
         curl_finger(17)
-        coords[3] = [0.44, 0.62, 0.06]
-        coords[4] = [0.50, 0.62, 0.06]
+        coords[3] = [0.44, 0.62, 0.08]
+        coords[4] = [0.52, 0.62, 0.08]  # Thumb wrapped across front
 
     elif gesture == "T":
-        # Thumb tucked between index and middle (index curled over thumb)
+        # Fist with thumb poking UP between index and middle knuckles
         curl_finger(5)
         curl_finger(9)
         curl_finger(13)
         curl_finger(17)
-        coords[3] = [0.40, 0.62, 0.02]
-        coords[4] = [0.44, 0.58, 0.04]
+        coords[3] = [0.42, 0.64, 0.04]
+        coords[4] = [0.44, 0.55, 0.06]  # Thumb poking up between index/middle
 
     elif gesture == "U":
-        # Index and middle straight UP together (touching), others curled
-        extend_finger(5, -0.03, -1.0, 0.0)
-        extend_finger(9, 0.03, -1.0, 0.0)
+        # Index and middle straight UP together (touching, gap < 0.05)
+        extend_finger(5, -0.02, -1.0, 0.0)
+        extend_finger(9, 0.02, -1.0, 0.0)
         curl_finger(13)
         curl_finger(17)
-        coords[3] = [0.46, 0.64, 0.03]
-        coords[4] = [0.50, 0.64, 0.03]
+        coords[3] = [0.46, 0.64, 0.04]
+        coords[4] = [0.50, 0.64, 0.04]
 
     elif gesture == "V":
-        # Index and middle extended apart, ring and pinky curled
-        extend_finger(5, -0.3, -1.0, 0.0)
-        extend_finger(9, 0.3, -1.0, 0.0)
+        # Index and middle extended apart in a 'V' peace sign (gap > 0.20)
+        extend_finger(5, -0.28, -1.0, 0.0)
+        extend_finger(9, 0.28, -1.0, 0.0)
         curl_finger(13)
         curl_finger(17)
-        coords[3] = [0.46, 0.64, 0.03]
-        coords[4] = [0.50, 0.64, 0.03]
+        coords[3] = [0.46, 0.64, 0.04]
+        coords[4] = [0.50, 0.64, 0.04]
 
     elif gesture == "W":
-        # Index, middle, ring extended apart, pinky curled touching thumb
-        extend_finger(5, -0.35, -1.0, 0.0)
+        # Index, middle, ring extended UP and spread apart (W shape)
+        extend_finger(5, -0.32, -1.0, 0.0)
         extend_finger(9, 0.0, -1.0, 0.0)
-        extend_finger(13, 0.35, -1.0, 0.0)
+        extend_finger(13, 0.32, -1.0, 0.0)
         curl_finger(17)
-        coords[3] = [0.52, 0.65, 0.03]
-        coords[4] = [0.58, 0.65, 0.03]
+        coords[3] = [0.52, 0.66, 0.04]
+        coords[4] = [0.56, 0.66, 0.04]
 
     elif gesture == "X":
-        # Index bent like a hook, others curled
+        # Index finger bent into a hook shape, other fingers curled
         mcp = coords[5]
-        coords[6] = [mcp[0], mcp[1] - 0.05, 0.0]
-        coords[7] = [mcp[0] - 0.02, mcp[1] - 0.04, 0.03]
-        coords[8] = [mcp[0] - 0.03, mcp[1] - 0.01, 0.04]
+        coords[6] = [mcp[0], mcp[1] - 0.04, 0.02]
+        coords[7] = [mcp[0] - 0.02, mcp[1] - 0.03, 0.06]
+        coords[8] = [mcp[0] - 0.03, mcp[1] + 0.01, 0.08]  # Hook tip bent down
         curl_finger(9)
         curl_finger(13)
         curl_finger(17)
-        coords[3] = [0.46, 0.64, 0.03]
-        coords[4] = [0.50, 0.64, 0.03]
+        coords[3] = [0.46, 0.64, 0.04]
+        coords[4] = [0.50, 0.64, 0.04]
 
     elif gesture == "Y":
-        # Thumb and pinky extended wide, middle three curled
+        # Thumb and pinky extended wide horizontally (shaka / hang loose)
         curl_finger(5)
         curl_finger(9)
         curl_finger(13)
-        coords[3] = [0.26, 0.68, 0.0]
-        coords[4] = [0.18, 0.66, 0.0]
-        extend_finger(17, 0.8, -0.6, 0.0)
+        coords[3] = [0.24, 0.68, 0.0]
+        coords[4] = [0.14, 0.66, 0.0]   # Thumb extended far left
+        extend_finger(17, 0.85, -0.5, 0.0)  # Pinky extended far right
 
     elif gesture == "Z":
-        # Index pointing up/forward, others curled
-        extend_finger(5, -0.15, -0.9, 0.1)
+        # Index finger extended pointing forward/up with angled hand
+        extend_finger(5, -0.2, -0.9, 0.15)
         curl_finger(9)
         curl_finger(13)
         curl_finger(17)
-        coords[3] = [0.44, 0.64, 0.03]
-        coords[4] = [0.48, 0.64, 0.03]
+        coords[3] = [0.44, 0.64, 0.04]
+        coords[4] = [0.48, 0.64, 0.04]
 
     return coords
 

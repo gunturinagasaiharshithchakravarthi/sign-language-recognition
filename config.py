@@ -27,15 +27,15 @@ MAX_NUM_HANDS = 1
 MIN_DETECTION_CONFIDENCE = 0.7
 MIN_TRACKING_CONFIDENCE = 0.6
 
-# Landmark Specifications
+# Landmark & Kinematic Specifications
 NUM_LANDMARKS = 21  # 21 3D points (x, y, z) per hand
-NUM_COORDINATES = 42  # Normalized (x, y) relative coordinates (or 63 for x, y, z)
-USE_3D_LANDMARKS = True  # Using x, y, z gives 63 feature dimensions
+NUM_KINEMATICS = 22  # 22 invariant relative distance and curl features
+USE_3D_LANDMARKS = True
 
 if USE_3D_LANDMARKS:
-    FEATURE_COUNT = NUM_LANDMARKS * 3  # 63 features
+    FEATURE_COUNT = NUM_LANDMARKS * 3 + NUM_KINEMATICS  # 63 + 22 = 85 features
 else:
-    FEATURE_COUNT = NUM_LANDMARKS * 2  # 42 features
+    FEATURE_COUNT = NUM_LANDMARKS * 2 + NUM_KINEMATICS  # 42 + 22 = 64 features
 
 # Real-Time Recognition & Stabilization (Ultra-Fast Responsive Mode)
 CONFIDENCE_THRESHOLD = 0.40

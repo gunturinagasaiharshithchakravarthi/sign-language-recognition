@@ -355,6 +355,7 @@ if navigation == "Live Recognition Studio":
     with col_pred:
         st.subheader("Recognition Telemetry")
         pred_box_slot = st.empty()
+        top3_box_slot = st.empty()
         conf_progress_slot = st.empty()
         conf_caption_slot = st.empty()
         st.markdown("---")
@@ -378,12 +379,12 @@ if navigation == "Live Recognition Studio":
     sentence_card_slot = st.empty()
 
     # Helper function to dynamically update telemetry cards & sentence card (throttled)
-    def render_telemetry_ui(p_letter, r_letter, c_val, curr_sent):
+    def render_telemetry_ui(p_letter, r_letter, c_val, curr_sent, prob_dict=None):
         if p_letter:
             b_cls = "status-active"
             b_txt = "GESTURE CONFIRMED"
             disp_char = p_letter
-        elif r_letter and c_val >= 0.30:
+        elif r_letter and c_val >= 0.25:
             b_cls = "status-idle"
             b_txt = f"DETECTING: {r_letter} (HOLD STEADY)"
             disp_char = r_letter
@@ -406,6 +407,27 @@ if navigation == "Live Recognition Studio":
             """,
             unsafe_allow_html=True
         )
+
+        if prob_dict and len(prob_dict) >= 3:
+            s_probs = sorted(prob_dict.items(), key=lambda x: x[1], reverse=True)[:3]
+            t1_k, t1_v = s_probs[0]
+            t2_k, t2_v = s_probs[1]
+            t3_k, t3_v = s_probs[2]
+            top3_html = f"""
+            <div style="background: rgba(30, 41, 59, 0.75); border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 8px; padding: 8px 12px; margin-bottom: 8px;">
+                <div style="font-size: 0.72rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px;">
+                    Top Candidate Confidence:
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
+                    <span style="color: #00d4ff; font-weight: bold;">1. {t1_k} ({t1_v*100:.0f}%)</span>
+                    <span style="color: #cbd5e1; font-weight: 500;">2. {t2_k} ({t2_v*100:.0f}%)</span>
+                    <span style="color: #64748b; font-weight: 500;">3. {t3_k} ({t3_v*100:.0f}%)</span>
+                </div>
+            </div>
+            """
+            top3_box_slot.markdown(top3_html, unsafe_allow_html=True)
+        else:
+            top3_box_slot.empty()
 
         conf_progress_slot.progress(min(max(float(c_val), 0.0), 1.0))
         conf_caption_slot.caption(
@@ -440,7 +462,8 @@ if navigation == "Live Recognition Studio":
         st.session_state.last_predicted_letter,
         None,
         st.session_state.last_confidence,
-        st.session_state.text_generator.get_text()
+        st.session_state.text_generator.get_text(),
+        getattr(st.session_state, "last_prob_dict", None)
     )
 
     with col_cam:
@@ -476,6 +499,66 @@ if navigation == "Live Recognition Studio":
                 - **`Z`**: Index finger pointing up/forward, others curled.
                 """
             )
+
+        # ----------------------------------------------------
+        # Instant In-App Gesture Calibrator
+        # ----------------------------------------------------
+        with st.expander("🎯 One-Click Gesture Calibrator (Fine-Tune Tricky Letters for Your Hand)", expanded=False):
+            st.markdown(
+                """
+                **Have an alphabet letter that's struggling or glitching on your specific webcam?**  
+                Select the letter below, hold your hand in front of the camera, and click **Calibrate**. The system records your live hand anatomy and fine-tunes the AI in ~2 seconds!
+                """
+            )
+            cal_col1, cal_col2 = st.columns([1, 1])
+            with cal_col1:
+                target_cal_letter = st.selectbox("Select Letter to Calibrate:", GESTURE_CLASSES, index=2, key="cal_letter_select")
+            with cal_col2:
+                num_cal_samples = st.slider("Samples to Record:", min_value=15, max_value=50, value=25, step=5, key="cal_samples_slider")
+
+            if st.button(f"📸 Record {num_cal_samples} Frames & Calibrate '{target_cal_letter}'", type="primary", use_container_width=True):
+                with st.spinner(f"Calibrating '{target_cal_letter}'... Hold your hand steady showing '{target_cal_letter}'"):
+                    cap_cal = cv2.VideoCapture(CAMERA_INDEX)
+                    cap_cal.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
+                    cap_cal.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
+                    cal_feats = []
+                    cal_prog = st.progress(0.0)
+                    start_cal_time = time.time()
+
+                    while len(cal_feats) < num_cal_samples and (time.time() - start_cal_time) < 10.0:
+                        ret_c, f_c = cap_cal.read()
+                        if not ret_c:
+                            break
+                        if mirror_mode:
+                            f_c = cv2.flip(f_c, 1)
+                        lms, _ = detector.process_frame(f_c)
+                        if lms:
+                            ft = detector.extract_features(lms[0], include_z=USE_3D_LANDMARKS)
+                            cal_feats.append(ft)
+                            cal_prog.progress(len(cal_feats) / num_cal_samples)
+                        time.sleep(0.04)
+
+                    cap_cal.release()
+
+                    if len(cal_feats) >= 10:
+                        import pandas as pd
+                        df_old = pd.read_csv(DATASET_PATH)
+                        feat_cols = [c for c in df_old.columns if c != "label"]
+                        new_data = pd.DataFrame(cal_feats, columns=feat_cols)
+                        new_data["label"] = target_cal_letter
+                        updated_df = pd.concat([df_old, new_data], ignore_index=True)
+                        updated_df.to_csv(DATASET_PATH, index=False)
+
+                        X_all = np.array(updated_df.drop(columns=["label"]), dtype=np.float32)
+                        y_all = np.array(updated_df["label"], dtype=str)
+                        classifier.fit(X_all, y_all)
+                        classifier.save(MODEL_PATH, LABEL_ENCODER_PATH)
+
+                        st.success(f"🎉 Successfully calibrated '{target_cal_letter}' with {len(cal_feats)} real webcam frames! Accuracy updated.")
+                        time.sleep(1.0)
+                        st.rerun()
+                    else:
+                        st.error("No hand detected. Please hold your hand clearly in front of the camera and try again.")
 
         # ----------------------------------------------------
         # Mode A: Continuous Webcam Stream (OpenCV cv2)
@@ -530,6 +613,7 @@ if navigation == "Live Recognition Studio":
 
                                 st.session_state.last_predicted_letter = pred_label
                                 st.session_state.last_confidence = conf
+                                st.session_state.last_prob_dict = prob_dict
 
                                 if auto_confirm and pred_label:
                                     confirmed = st.session_state.text_generator.update_prediction(pred_label)
@@ -538,7 +622,9 @@ if navigation == "Live Recognition Studio":
                             else:
                                 st.session_state.last_predicted_letter = None
                                 st.session_state.last_confidence = 0.0
+                                st.session_state.last_prob_dict = {}
                                 st.session_state.text_generator.update_prediction(None)
+                                prob_dict = {}
                         else:
                             annotated_frame = frame
 
@@ -553,14 +639,19 @@ if navigation == "Live Recognition Studio":
                         cv2.rectangle(overlay_top, (0, h_f - 40), (w_f, h_f), (10, 14, 23), -1)
                         cv2.addWeighted(overlay_top, 0.70, annotated_frame, 0.30, 0, annotated_frame)
 
+                        top3_list = sorted(prob_dict.items(), key=lambda x: x[1], reverse=True)[:3] if prob_dict else []
                         if pred_label:
                             cv2.putText(annotated_frame, f"PREDICTION: {pred_label}", (15, 38), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 255, 255), 2, cv2.LINE_AA)
                             cv2.putText(annotated_frame, f"CONF: {conf*100:.0f}%", (w_f - 170, 38), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 255, 128), 2, cv2.LINE_AA)
-                        elif raw_label and conf >= 0.30:
+                        elif raw_label and conf >= 0.25:
                             cv2.putText(annotated_frame, f"DETECTING: {raw_label} ({conf*100:.0f}%)", (15, 38), cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 180, 255), 2, cv2.LINE_AA)
                             cv2.putText(annotated_frame, "HOLD STEADY", (w_f - 170, 38), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 180, 255), 1, cv2.LINE_AA)
                         else:
-                            cv2.putText(annotated_frame, "SHOW ASL SIGN (L, V, W, Y, B...)", (15, 38), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (148, 163, 184), 2, cv2.LINE_AA)
+                            cv2.putText(annotated_frame, "SHOW ASL SIGN (C, D, E, L, V, Y...)", (15, 38), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (148, 163, 184), 2, cv2.LINE_AA)
+
+                        if top3_list and len(top3_list) >= 3 and conf >= 0.20:
+                            t_str = f"Top: 1.{top3_list[0][0]}({top3_list[0][1]*100:.0f}%) 2.{top3_list[1][0]}({top3_list[1][1]*100:.0f}%) 3.{top3_list[2][0]}({top3_list[2][1]*100:.0f}%)"
+                            cv2.putText(annotated_frame, t_str, (15, 75), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (220, 235, 255), 1, cv2.LINE_AA)
 
                         # Bottom Sentence Banner
                         disp_bottom = f">> {current_sent}" if current_sent else ">> Sentence: [Empty - hold a sign to add]"
@@ -576,7 +667,7 @@ if navigation == "Live Recognition Studio":
                         time_elapsed = (now - last_ui_update_time) >= 0.40
 
                         if state_changed or time_elapsed:
-                            render_telemetry_ui(pred_label, raw_label, conf, current_sent)
+                            render_telemetry_ui(pred_label, raw_label, conf, current_sent, prob_dict)
                             last_ui_update_time = now
                             last_ui_pred = pred_label
                             last_ui_sent = current_sent
@@ -630,10 +721,10 @@ if navigation == "Live Recognition Studio":
 
                     if landmarks_list and classifier:
                         features = detector.extract_features(landmarks_list[0], include_z=USE_3D_LANDMARKS)
-                        pred_label, conf, _, raw_label = safe_predict(classifier, features)
+                        pred_label, conf, prob_dict, raw_label = safe_predict(classifier, features)
                         st.session_state.last_predicted_letter = pred_label
                         st.session_state.last_confidence = conf
-                        render_telemetry_ui(pred_label, raw_label, conf, st.session_state.text_generator.get_text())
+                        render_telemetry_ui(pred_label, raw_label, conf, st.session_state.text_generator.get_text(), prob_dict)
                         if pred_label:
                             status_placeholder.success(f"Recognized: {pred_label} ({conf*100:.1f}%)")
                     else:
@@ -660,10 +751,10 @@ if navigation == "Live Recognition Studio":
 
                     if landmarks_list and classifier:
                         features = detector.extract_features(landmarks_list[0], include_z=USE_3D_LANDMARKS)
-                        pred_label, conf, _, raw_label = safe_predict(classifier, features)
+                        pred_label, conf, prob_dict, raw_label = safe_predict(classifier, features)
                         st.session_state.last_predicted_letter = pred_label
                         st.session_state.last_confidence = conf
-                        render_telemetry_ui(pred_label, raw_label, conf, st.session_state.text_generator.get_text())
+                        render_telemetry_ui(pred_label, raw_label, conf, st.session_state.text_generator.get_text(), prob_dict)
                         if pred_label:
                             status_placeholder.success(f"Recognized Gesture: '{pred_label}' ({conf*100:.1f}%)")
                     else:
@@ -677,8 +768,9 @@ if navigation == "Live Recognition Studio":
 
     with c1:
         if st.button("➕ Add Letter", use_container_width=True):
-            if pred_letter:
-                st.session_state.text_generator.add_letter(pred_letter)
+            to_add = st.session_state.last_predicted_letter
+            if to_add:
+                st.session_state.text_generator.add_letter(to_add)
                 st.rerun()
             else:
                 st.toast("No gesture detected to add!", icon="⚠️")
@@ -700,16 +792,17 @@ if navigation == "Live Recognition Studio":
 
     with c5:
         if st.button("🔊 Speak Text", type="primary", use_container_width=True):
-            if current_sentence.strip():
-                started = st.session_state.speech_generator.speak(current_sentence)
+            curr_speech_text = st.session_state.text_generator.get_text()
+            if curr_speech_text.strip():
+                started = st.session_state.speech_generator.speak(curr_speech_text)
                 if started:
-                    st.toast(f"Synthesizing: '{current_sentence}'", icon="🎙️")
+                    st.toast(f"Synthesizing: '{curr_speech_text}'", icon="🎙️")
                 # Also inject browser-native speech synthesis fallback
                 st.markdown(
                     f"""
                     <script>
                         if ('speechSynthesis' in window) {{
-                            const utterance = new SpeechSynthesisUtterance({json.dumps(current_sentence)});
+                            const utterance = new SpeechSynthesisUtterance({json.dumps(curr_speech_text)});
                             utterance.rate = 1.0;
                             window.speechSynthesis.speak(utterance);
                         }}

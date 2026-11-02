@@ -19,12 +19,12 @@ class TestLandmarkExtraction(unittest.TestCase):
         self.raw_coords = np.random.uniform(0.1, 0.9, size=(21, 3)).astype(np.float32)
 
     def test_landmark_shape(self):
-        """Verify vector shape matches 63 for 3D and 42 for 2D."""
+        """Verify vector shape matches 85 for 3D and 64 for 2D (including 22 kinematic metrics)."""
         vec_3d = normalize_landmarks(self.raw_coords, include_z=True)
-        self.assertEqual(vec_3d.shape, (63,))
+        self.assertEqual(vec_3d.shape, (85,))
 
         vec_2d = normalize_landmarks(self.raw_coords, include_z=False)
-        self.assertEqual(vec_2d.shape, (42,))
+        self.assertEqual(vec_2d.shape, (64,))
 
     def test_translation_invariance(self):
         """Shifting hand position anywhere in the frame must produce identical normalized vectors."""
@@ -51,12 +51,13 @@ class TestLandmarkExtraction(unittest.TestCase):
     def test_feature_names(self):
         """Ensure feature name generator matches dimensions."""
         names_3d = generate_feature_names(include_z=True)
-        self.assertEqual(len(names_3d), 63)
+        self.assertEqual(len(names_3d), 85)
         self.assertIn("WRIST_x", names_3d)
         self.assertIn("INDEX_FINGER_TIP_z", names_3d)
+        self.assertIn("dist_wrist_index", names_3d)
 
         names_2d = generate_feature_names(include_z=False)
-        self.assertEqual(len(names_2d), 42)
+        self.assertEqual(len(names_2d), 64)
 
     def test_connections_count(self):
         """Verify hand skeletal topology contains standard 21 connections."""
